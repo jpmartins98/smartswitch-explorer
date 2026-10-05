@@ -82,6 +82,7 @@ def test_select_existing_directory_returns_none_when_cancelled(monkeypatch) -> N
 
 @pytest.mark.parametrize("selected_names", [[], ["first.data", "second.penc"]])
 def test_landing_page_direct_file_selection(monkeypatch, tmp_path, selected_names) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])
     page = landing_page.LandingPage()
     selections: list[list[Path]] = []
