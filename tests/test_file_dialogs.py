@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QFileDialog
+import pytest
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 from gui.ui import file_dialogs
+from gui.ui import landing_page
 
 
 class _FakeFileDialog:
@@ -76,3 +78,22 @@ def test_select_existing_directory_returns_none_when_cancelled(monkeypatch) -> N
     monkeypatch.setattr(file_dialogs, "QFileDialog", _FakeFileDialog)
 
     assert file_dialogs.select_existing_directory(None, "Pick folder") is None  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("selected_names", [[], ["first.data", "second.penc"]])
+def test_landing_page_direct_file_selection(monkeypatch, tmp_path, selected_names) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+    page = landing_page.LandingPage()
+    selections: list[list[Path]] = []
+    page.file_selected.connect(selections.append)
+    paths = [str(tmp_path / name) for name in selected_names]
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", lambda *args: (paths, ""))
+
+    try:
+        page._open_file_dialog()
+        assert selections == ([[Path(path) for path in paths]] if paths else [])
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()

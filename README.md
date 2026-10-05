@@ -39,10 +39,13 @@ SmartSwitch Explorer is a desktop app for finding encrypted Samsung Smart Switch
 ## How to use
 
 1. Launch the app.
-2. Pick a folder that contains backups, or a parent folder like a mounted home directory, `Documents`, or `Samsung`.
+2. Pick a folder that contains backups, or a parent folder like a mounted home directory, `Documents`, or `Samsung`. Alternatively, click **Open File Directly** to select one or more Smart Switch files; cancelling leaves the current selection unchanged.
 3. Select a detected backup.
 4. Choose what to export.
 5. Set the destination folder and click **Export Selected**.
+
+**Refresh** rescans remembered folders and automatically detected backup locations.
+When no locations are available, it immediately shows **No backups detected**.
 
 ### Linux AppImage permissions
 
@@ -72,6 +75,14 @@ uv run smartswitch-explorer
 ```bash
 nix run github:sachk/smartswitch-explorer
 ```
+
+## Release workflow
+
+CI and release actions are pinned to reviewed commits. Build jobs use read-only
+repository permissions and do not retain checkout credentials; only the
+tag-triggered publishing job can write release assets. Artifact uploads fail
+when no files are found. The publisher downloads artifacts from its own workflow
+run with GitHub CLI and uploads files from the per-artifact directories.
 
 Additional format docs:
 
