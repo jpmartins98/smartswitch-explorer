@@ -8,6 +8,7 @@ from gui.ui import landing_page
 
 
 def test_empty_refresh_clears_stale_results_and_finishes(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])
     page = landing_page.LandingPage()
     monkeypatch.setattr(landing_page, "discover_backup_roots", lambda: [])
@@ -32,6 +33,7 @@ def test_empty_refresh_clears_stale_results_and_finishes(monkeypatch, tmp_path) 
 
 @pytest.mark.parametrize("scan_error", [False, True])
 def test_queued_refresh_completes_after_worker_result_or_error(monkeypatch, tmp_path, scan_error) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])
     page = landing_page.LandingPage()
     monkeypatch.setattr(landing_page, "discover_backup_roots", lambda: [tmp_path])
