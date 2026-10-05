@@ -44,6 +44,14 @@ uv run smartswitch-explorer
 nix run github:sachk/smartswitch-explorer
 ```
 
+## Release workflow
+
+CI and release actions are pinned to reviewed commits. Build jobs use read-only
+repository permissions and do not retain checkout credentials; only the
+tag-triggered publishing job can write release assets. Artifact uploads fail
+when no files are found. The publisher downloads artifacts from its own workflow
+run with GitHub CLI and uploads files from the per-artifact directories.
+
 Additional format docs:
 
 - `docs/calllog_format.md`
