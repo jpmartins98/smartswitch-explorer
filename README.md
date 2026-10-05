@@ -26,7 +26,7 @@ SmartSwitch Explorer is a desktop app for finding encrypted Samsung Smart Switch
 ## How to use
 
 1. Launch the app.
-2. Pick a folder that contains backups, or a parent folder like a mounted home directory, `Documents`, or `Samsung`.
+2. Pick a folder that contains backups, or a parent folder like a mounted home directory, `Documents`, or `Samsung`. Alternatively, click **Open File Directly** to select one or more Smart Switch files; cancelling leaves the current selection unchanged.
 3. Select a detected backup.
 4. Choose what to export.
 5. Set the destination folder and click **Export Selected**.
