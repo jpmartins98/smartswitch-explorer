@@ -15,9 +15,16 @@
   <a href="https://github.com/sachk/smartswitch-explorer/releases/latest"><strong>Other Downloads</strong></a>
 </h3>
 
-The x64 legacy AppImage is built and tested on Ubuntu 22.04 for distributions
-with GLIBC 2.35 or newer. The current ARM64 Qt dependency requires GLIBC 2.39,
-so a legacy ARM64 build is not available.
+The x64 legacy AppImage targets Ubuntu 22.04 (GLIBC 2.35). Release builds check
+the bundled ELF dependency requirements and smoke-test the packaged AppImage on
+Ubuntu 22.04. GLIBC 2.35 is a minimum, not a guarantee for every distribution:
+system graphics, font, and desktop libraries are still required. The locked
+ARM64 Qt dependency targets GLIBC 2.39, so a legacy ARM64 build is not available.
+
+AppImage builds use SHA-256-verified appimagetool 1.9.1 and type2-runtime
+20251108 downloads in a private temporary directory. Both architectures'
+version pins and digests live in `scripts/release/build_appimage.sh`; update
+them together when upgrading these tools.
 
 SmartSwitch Explorer is a desktop app for finding encrypted Samsung Smart Switch backups and exporting decrypted contents:
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -11,28 +12,33 @@ GLIBC_VERSION_PATTERN = re.compile(r"\bGLIBC_(\d+(?:\.\d+)*)\b")
 
 
 def parse_version(value: str) -> tuple[int, ...]:
-    try:
-        version = tuple(int(part) for part in value.split("."))
-    except ValueError as exc:
-        raise ValueError(f"Invalid version: {value}") from exc
-    if not version:
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", value):
         raise ValueError(f"Invalid version: {value}")
-    return version
+    parts = [int(part) for part in value.split(".")]
+    while parts[-1] == 0 and len(parts) > 2:
+        parts.pop()
+    return tuple(parts)
 
 
 def required_glibc_versions(readelf_output: str) -> set[tuple[int, ...]]:
-    return {
-        parse_version(match.group(1))
-        for match in GLIBC_VERSION_PATTERN.finditer(readelf_output)
-    }
+    # Definitions describe versions an ELF provides, not versions it requires.
+    # readelf also lists symbol versions; only the needs section is authoritative.
+    versions: set[tuple[int, ...]] = set()
+    in_needs = False
+    for line in readelf_output.splitlines():
+        if line.startswith("Version "):
+            in_needs = line.startswith("Version needs section ")
+        elif in_needs:
+            versions.update(
+                parse_version(match.group(1))
+                for match in GLIBC_VERSION_PATTERN.finditer(line)
+            )
+    return versions
 
 
 def _is_elf(path: Path) -> bool:
-    try:
-        with path.open("rb") as stream:
-            return stream.read(4) == b"\x7fELF"
-    except OSError:
-        return False
+    with path.open("rb") as stream:
+        return stream.read(4) == b"\x7fELF"
 
 
 def inspect_bundle(root: Path) -> tuple[tuple[int, ...], list[Path], int]:
@@ -45,10 +51,11 @@ def inspect_bundle(root: Path) -> tuple[tuple[int, ...], list[Path], int]:
             continue
         elf_count += 1
         result = subprocess.run(
-            ["readelf", "--version-info", str(path)],
+            ["readelf", "--wide", "--version-info", str(path)],
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, "LC_ALL": "C"},
         )
         if result.returncode != 0:
             raise RuntimeError(f"readelf failed for {path}: {result.stderr.strip()}")
@@ -74,14 +81,20 @@ def main() -> int:
         description="Reject a Linux bundle that requires a newer GLIBC than intended."
     )
     parser.add_argument("bundle", type=Path, help="Directory containing the Linux bundle.")
-    parser.add_argument("--max-version", required=True, help="Highest permitted GLIBC version.")
+    parser.add_argument(
+        "--max-version", required=True, type=parse_version, help="Highest permitted GLIBC version."
+    )
     args = parser.parse_args()
 
     if not args.bundle.is_dir():
         parser.error(f"Bundle directory does not exist: {args.bundle}")
 
-    permitted = parse_version(args.max_version)
-    highest, owners, elf_count = inspect_bundle(args.bundle)
+    permitted = args.max_version
+    try:
+        highest, owners, elf_count = inspect_bundle(args.bundle)
+    except (OSError, RuntimeError) as exc:
+        print(f"::error::{exc}")
+        return 1
     if elf_count == 0:
         print(f"::error::No ELF files found in {args.bundle}")
         return 1
