@@ -31,6 +31,9 @@ SmartSwitch Explorer is a desktop app for finding encrypted Samsung Smart Switch
 4. Choose what to export.
 5. Set the destination folder and click **Export Selected**.
 
+**Refresh** rescans remembered folders and automatically detected backup locations.
+When no locations are available, it immediately shows **No backups detected**.
+
 ## Running from source
 
 ```bash

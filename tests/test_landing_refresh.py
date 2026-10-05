@@ -1,43 +1,74 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtWidgets import QApplication
+import pytest
+
 from gui.ui import landing_page
 
 
-class _SignalRecorder:
-    def __init__(self) -> None:
-        self.calls: list[tuple[object, ...]] = []
-
-    def emit(self, *args: object) -> None:
-        self.calls.append(args)
-
-
-class _UnexpectedThreadPool:
-    def start(self, _worker: object) -> None:
-        raise AssertionError("Refresh without roots must not start a worker")
-
-
-class _RefreshState:
-    def __init__(self) -> None:
-        self._refresh_running = False
-        self._refresh_pending = False
-        self._refresh_worker = None
-        self._recent_backup_hints = []
-        self._thread_pool = _UnexpectedThreadPool()
-        self.listing_started = _SignalRecorder()
-        self.results: list[list[landing_page.BackupRowModel]] = []
-
-    def _on_refresh_result(self, rows: list[landing_page.BackupRowModel]) -> None:
-        self.results.append(rows)
-        self._refresh_running = False
-
-
-def test_refresh_without_selected_or_discovered_folder_finishes_synchronously(monkeypatch) -> None:
-    state = _RefreshState()
+def test_empty_refresh_clears_stale_results_and_finishes(monkeypatch, tmp_path) -> None:
+    app = QApplication.instance() or QApplication([])
+    page = landing_page.LandingPage()
     monkeypatch.setattr(landing_page, "discover_backup_roots", lambda: [])
+    page.set_recent_backups([tmp_path / "removed-backup"])
+    page.backup_list.addItem("stale backup")
+    events: list[str] = []
+    page.listing_started.connect(lambda: events.append("started"))
+    page.listing_finished.connect(lambda: events.append("finished"))
+    try:
+        page.refresh()
+        page.refresh()
+        assert events == ["started", "finished", "started", "finished"]
+        assert page.backup_list.count() == 0
+        assert page.backup_list.isHidden()
+        assert not page.empty_state.isHidden()
+        assert not page._refresh_running
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
 
-    landing_page.LandingPage.refresh(state)  # type: ignore[arg-type]
 
-    assert state.listing_started.calls == [()]
-    assert state.results == [[]]
-    assert state._refresh_running is False
-    assert state._refresh_worker is None
+@pytest.mark.parametrize("scan_error", [False, True])
+def test_queued_refresh_completes_after_worker_result_or_error(monkeypatch, tmp_path, scan_error) -> None:
+    app = QApplication.instance() or QApplication([])
+    page = landing_page.LandingPage()
+    monkeypatch.setattr(landing_page, "discover_backup_roots", lambda: [tmp_path])
+    if scan_error:
+        def fail_scan(_root):
+            raise OSError("unreadable backup root")
+        monkeypatch.setattr(landing_page, "find_backups", fail_scan)
+    events: list[str] = []
+    errors: list[str] = []
+    loop = QEventLoop()
+    timer = QTimer()
+    timer.setSingleShot(True)
+    timer.timeout.connect(loop.quit)
+    page.listing_started.connect(lambda: events.append("started"))
+    page.listing_error.connect(errors.append)
+
+    def finished():
+        events.append("finished")
+        if events.count("finished") == 2:
+            loop.quit()
+
+    page.listing_finished.connect(finished)
+    try:
+        page.refresh()
+        page.refresh()
+        timer.start(5000)
+        loop.exec()
+        assert events == ["started", "finished", "started", "finished"]
+        assert len(errors) == (2 if scan_error else 0)
+        if scan_error:
+            assert all("unreadable backup root" in error for error in errors)
+        assert not page._refresh_running
+        assert not page._refresh_pending
+        assert page.backup_list.count() == 0
+    finally:
+        timer.stop()
+        page._thread_pool.waitForDone()
+        page.close()
+        page.deleteLater()
+        app.processEvents()
